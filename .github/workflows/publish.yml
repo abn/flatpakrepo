@@ -31,7 +31,7 @@ concurrency:
 
 jobs:
   publish:
-    uses: aetherpak/actions/.github/workflows/publish-multi.yml@v1
+    uses: aetherpak/actions/.github/workflows/publish-multi.yml@v2
     with:
       config: aetherpak.yaml
       app: ${{ inputs.app || '' }}
