@@ -1,0 +1,7 @@
+_site/
+_repo*/
+_oci-image/
+repos/
+.flatpak-builder/
+build-dir/
+*.flatpak

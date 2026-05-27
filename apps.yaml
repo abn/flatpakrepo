@@ -1,0 +1,21 @@
+# Declarative list of apps published by this repository.
+#
+# Each entry is explicit — no manifest parsing, no per-app overrides hidden in
+# the submodule. To add an app: add a submodule under apps/, then append an
+# entry here with its manifest path, the flathub-infra container tag for its
+# runtime (`gnome-50`, `freedesktop-24.08`, `kde-6-8`, ...), and the arches to
+# build for.
+#
+# Fields:
+#   id        Reverse-DNS application ID (must match the manifest's app-id).
+#   manifest  Path to the manifest relative to the repository root.
+#   runtime   flathub-infra/flatpak-github-actions image tag for the runtime.
+#   arches    List of architectures: any subset of [x86_64, aarch64].
+#   branch    Optional. Flatpak channel; defaults to 'stable'.
+
+apps:
+  - id: ai.lemonade_server.Lemonade
+    manifest: apps/ai.lemonade_server.Lemonade/ai.lemonade_server.Lemonade.yaml
+    runtime: gnome-50
+    arches: [x86_64]
+    branch: stable

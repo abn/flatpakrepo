@@ -1,0 +1,85 @@
+name: Publish Flatpak Repository
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      app:
+        description: "Rebuild only this app id (leave blank to use change detection)."
+        required: false
+        type: string
+        default: ""
+      force-all:
+        description: "Rebuild every app in apps.yaml."
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    # Weekly full rebuild so runtime image updates pick up upstream security fixes.
+    - cron: "0 6 * * 0"
+
+permissions:
+  contents: read
+  packages: write
+  pages: write
+  id-token: write
+
+# Cross-run lock so a new push can't race a deploy already in flight.
+concurrency:
+  group: flatpakrepo-publish
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Submodule pointer bumps are visible as gitlink changes in the parent
+          # tree, so the submodule contents themselves are not needed here.
+          fetch-depth: 0
+          submodules: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Install pyyaml
+        run: pip install pyyaml
+        shell: bash
+
+      - name: Compute build matrix
+        id: plan
+        env:
+          FORCE: ${{ (github.event_name == 'schedule' || inputs.force-all) && 'all' || inputs.app }}
+          BASE_SHA: ${{ github.event.before }}
+        run: python .github/scripts/plan.py
+
+  publish:
+    name: Publish ${{ matrix.app-id }}
+    needs: plan
+    if: ${{ needs.plan.outputs.count != '0' }}
+    strategy:
+      # max-parallel: 1 keeps the aetherpak reusable workflow's job-level
+      # concurrency lock from ever seeing 3+ pending; otherwise GitHub Actions
+      # would cancel the oldest pending and drop an app.
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    uses: aetherpak/actions/.github/workflows/publish.yml@v1
+    with:
+      manifest-path: ${{ matrix.manifest }}
+      runtime: ${{ matrix.runtime }}
+      arches: ${{ matrix.arches }}
+      branch: ${{ matrix.branch }}
+      run-linter: false
+    secrets:
+      gpg-private-key: ${{ secrets.AETHERPAK_GPG_KEY }}
+      gpg-private-key-passphrase: ${{ secrets.AETHERPAK_GPG_KEY_PASSPHRASE }}

@@ -1,0 +1,4 @@
+[submodule "apps/ai.lemonade_server.Lemonade"]
+	path = apps/ai.lemonade_server.Lemonade
+	url = https://github.com/lemonade-sdk/lemonade-flatpak.git
+	branch = main
