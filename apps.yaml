@@ -7,10 +7,12 @@
 #             Each arch needs a `url` and `sha256`.
 #
 # Common fields:
-#   id        Reverse-DNS application ID (must match the manifest's app-id).
-#   arches    Optional. For manifest: list of arches to build; defaults to [x86_64].
-#             For bundles: derived from the bundles keys.
-#   branch    Optional. Flatpak channel; defaults to 'stable'.
+#   id          Reverse-DNS application ID (must match the manifest's app-id).
+#   arches      Optional. For manifest: list of arches to build; defaults to [x86_64].
+#               For bundles: derived from the bundles keys.
+#   branch      Optional. Flatpak channel; defaults to 'stable'.
+#   run-linter  Optional. Manifest entries only. Defaults to false; set true to
+#               run flatpak-builder-lint against the built repo.
 
 apps:
   - id: ai.lemonade_server.Lemonade

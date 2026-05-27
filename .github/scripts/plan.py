@@ -16,7 +16,8 @@ Outputs (GITHUB_OUTPUT):
     count-bundle      number of bundle entries (used to gate the prep-bundle job)
 
 Row shape:
-    manifest: {source, app-id, manifest, runtime, branch, arch, runner}
+    manifest: {source, app-id, manifest, runtime, branch, arch, runner,
+               run-linter}
     bundle:   {source, app-id, branch, arch, runner, bundle-url, bundle-sha256}
 """
 from __future__ import annotations
@@ -171,6 +172,7 @@ def expand_matrix(apps: list[dict], selected: list[str]) -> list[dict]:
         branch = app.get("branch", "stable")
         if "manifest" in app:
             arches = app.get("arches", ["x86_64"])
+            run_linter = bool(app.get("run-linter", False))
             for arch in arches:
                 include.append({
                     "source": "manifest",
@@ -180,6 +182,7 @@ def expand_matrix(apps: list[dict], selected: list[str]) -> list[dict]:
                     "branch": branch,
                     "arch": arch,
                     "runner": RUNNER_BY_ARCH[arch],
+                    "run-linter": run_linter,
                 })
         else:
             for arch, b in app["bundles"].items():

@@ -92,7 +92,7 @@ jobs:
           arch: ${{ matrix.arch }}
           branch: ${{ matrix.branch }}
           repo-path: _repo
-          run-linter: false
+          run-linter: ${{ matrix.run-linter }}
 
       - name: Upload OSTree repository
         uses: actions/upload-artifact@v7
@@ -135,7 +135,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Create empty site
-        run: mkdir -p _site
+        # An empty directory uploads to no artifact; a marker file makes the
+        # artifact materialize so downstream publish cells can always download it.
+        run: |
+          mkdir -p _site
+          touch _site/.aetherpak-init
 
       - name: Upload empty site
         uses: actions/upload-artifact@v7
@@ -144,7 +148,6 @@ jobs:
           path: _site
           include-hidden-files: true
           retention-days: 1
-          if-no-files-found: ignore
 
   publish:
     name: Publish ${{ matrix.app-id }} (${{ matrix.arch }})
