@@ -15,9 +15,11 @@ on:
         required: false
         type: boolean
         default: false
-  schedule:
-    # Weekly full rebuild so runtime image updates pick up upstream security fixes.
-    - cron: "0 6 * * 0"
+      reconcile-only:
+        description: "Skip build/publish; only reconcile the index against the registry and redeploy."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -36,6 +38,7 @@ jobs:
       config: aetherpak.yaml
       app: ${{ inputs.app || '' }}
       force-all: ${{ inputs.force-all || false }}
+      reconcile-only: ${{ inputs.reconcile-only || false }}
       workflow-path: .github/workflows/publish.yml
     secrets:
       gpg-private-key: ${{ secrets.AETHERPAK_GPG_KEY }}
