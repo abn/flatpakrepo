@@ -34,8 +34,8 @@ jobs:
     uses: aetherpak/actions/.github/workflows/publish-multi.yml@v1
     with:
       config: aetherpak.yaml
-      app: ${{ inputs.app }}
-      force-all: ${{ inputs.force-all }}
+      app: ${{ inputs.app || '' }}
+      force-all: ${{ inputs.force-all || false }}
       workflow-path: .github/workflows/publish.yml
     secrets:
       gpg-private-key: ${{ secrets.AETHERPAK_GPG_KEY }}
