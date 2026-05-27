@@ -11,7 +11,7 @@ on:
         type: string
         default: ""
       force-all:
-        description: "Rebuild every app in apps.yaml."
+        description: "Rebuild every app in aetherpak.yaml."
         required: false
         type: boolean
         default: false
@@ -33,10 +33,9 @@ jobs:
   publish:
     uses: aetherpak/actions/.github/workflows/publish-multi.yml@v1
     with:
+      config: aetherpak.yaml
       app: ${{ inputs.app }}
       force-all: ${{ inputs.force-all }}
-      # Forces a rebuild-all when the caller workflow changes (the planner
-      # already covers apps.yaml via per-entry diffing).
       workflow-path: .github/workflows/publish.yml
     secrets:
       gpg-private-key: ${{ secrets.AETHERPAK_GPG_KEY }}

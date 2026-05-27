@@ -8,7 +8,7 @@ and one-click `.flatpakref` files live there.
 
 ## Apps
 
-Apps are declared in [`apps.yaml`](apps.yaml). Each entry uses one of two
+Apps are declared in [`aetherpak.yaml`](aetherpak.yaml). Each entry uses one of two
 source kinds:
 
 ```yaml
@@ -35,7 +35,7 @@ SHA-256, and re-tag to the entry's `branch` (default `stable`).
 # Manifest source
 git submodule add https://github.com/<owner>/<repo>.git apps/<appid>
 # Bundle source: just append the entry; no submodule
-$EDITOR apps.yaml
+$EDITOR aetherpak.yaml
 git commit -am "add <appid>"
 git push
 ```
@@ -45,8 +45,8 @@ git push
 ```bash
 # Manifest source
 git submodule update --remote apps/<appid>
-# Bundle source: bump the version in URL and update sha256 in apps.yaml
-$EDITOR apps.yaml
+# Bundle source: bump the version in URL and update sha256 in aetherpak.yaml
+$EDITOR aetherpak.yaml
 git commit -am "bump <appid>"
 git push
 ```
