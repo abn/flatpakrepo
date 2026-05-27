@@ -67,29 +67,14 @@ rebuilt.
 
 ## Build pipeline
 
-[`.github/workflows/publish.yml`](.github/workflows/publish.yml) runs on
-`push`, `workflow_dispatch`, and a weekly `schedule`:
-
-1. **plan** — [`plan.py`](.github/scripts/plan.py) diffs `HEAD` against
-   `github.event.before`, then narrows the rebuild set per app:
-   - Manifest apps rebuild if their directory has touched files, *or* their
-     entry-dict in `apps.yaml` changed.
-   - Bundle apps rebuild only if their entry-dict in `apps.yaml` changed (sha
-     bump, URL change, arches change, …).
-   - Touching the workflow or `plan.py` itself force-rebuilds everything.
-2. **build-manifest** — `(app × arch)` matrix in a `flathub-infra` container,
-   parallel. Uploads OSTree-repo artifacts.
-3. **prep-bundle** — `(app × arch)` matrix on a vanilla runner, parallel.
-   `curl -fL` + `sha256sum -c`, then uploads each verified `.flatpak`.
-4. **publish** — single matrix over both sources with `max-parallel: 1`. Each
-   cell downloads the running site artifact, runs `aetherpak/actions/publish@v1`
-   with either `repo-path` (manifest) or `bundle-path` (bundle), then re-uploads
-   the site. Serialization keeps `index/static`, blobs, and signatures from
-   clobbering across cells.
-5. **deploy** — one `actions/deploy-pages@v5` from the final site artifact.
-
-The top-level `concurrency: flatpakrepo-publish` (`cancel-in-progress: false`)
-prevents two runs from racing each other's deploys.
+[`.github/workflows/publish.yml`](.github/workflows/publish.yml) is a thin
+caller of
+[`aetherpak/actions/.github/workflows/publish-multi.yml@v1`](https://github.com/aetherpak/actions/blob/v1/.github/workflows/publish-multi.yml),
+which owns: change detection (per-entry diff of `apps.yaml` against the base
+SHA), manifest builds in flathub containers, bundle fetch + sha verify + ref
+re-tag, parallel OCI push (per app/arch), single site aggregation, and Pages
+deploy. The top-level `concurrency: flatpakrepo-publish` keeps two of our runs
+from racing each other's deploys.
 
 ### Manual triggers
 
