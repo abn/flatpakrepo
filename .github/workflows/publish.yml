@@ -189,6 +189,20 @@ jobs:
           name: bundle-${{ matrix.app-id }}-${{ matrix.arch }}
           path: _bundle
 
+      - name: Initialize OSTree repo for bundle import
+        # aetherpak's publish action calls `flatpak build-import-bundle` directly
+        # and requires repo-path to already be a valid OSTree repo. Pre-init it
+        # here; the publish action's `Ensure tooling` step no-ops afterwards.
+        if: ${{ matrix.source == 'bundle' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v ostree >/dev/null 2>&1 || ! command -v flatpak >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y flatpak ostree
+          fi
+          ostree --repo=_repo init --mode=archive-z2
+
       - name: Publish
         uses: aetherpak/actions/publish@v1
         with:
