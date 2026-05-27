@@ -1,16 +1,15 @@
 # Declarative list of apps published by this repository.
 #
-# Each entry is explicit — no manifest parsing, no per-app overrides hidden in
-# the submodule. To add an app: add a submodule under apps/, then append an
-# entry here with its manifest path, the flathub-infra container tag for its
-# runtime (`gnome-50`, `freedesktop-24.08`, `kde-6-8`, ...), and the arches to
-# build for.
+# Two source kinds (mutually exclusive per entry):
+#   manifest  Build from a flatpak manifest checked into a submodule.
+#             Requires `manifest` (path) and `runtime` (flathub-infra tag).
+#   bundles   Import a prebuilt .flatpak release asset per architecture.
+#             Each arch needs a `url` and `sha256`.
 #
-# Fields:
+# Common fields:
 #   id        Reverse-DNS application ID (must match the manifest's app-id).
-#   manifest  Path to the manifest relative to the repository root.
-#   runtime   flathub-infra/flatpak-github-actions image tag for the runtime.
-#   arches    List of architectures: any subset of [x86_64, aarch64].
+#   arches    Optional. For manifest: list of arches to build; defaults to [x86_64].
+#             For bundles: derived from the bundles keys.
 #   branch    Optional. Flatpak channel; defaults to 'stable'.
 
 apps:
@@ -19,3 +18,12 @@ apps:
     runtime: gnome-50
     arches: [x86_64]
     branch: stable
+
+  - id: com.stacklok.ToolHive
+    bundles:
+      x86_64:
+        url: https://github.com/stacklok/toolhive-studio/releases/download/v0.35.2/com.stacklok.ToolHive_x86_64.flatpak
+        sha256: 2159fc643175dcf54f8b9293f48fb8b11577fa0ea5514c2af622ff922d349a4a
+      aarch64:
+        url: https://github.com/stacklok/toolhive-studio/releases/download/v0.35.2/com.stacklok.ToolHive_aarch64.flatpak
+        sha256: a74e9855d8a66eaa03f9beff3c42b4973eb4ac91ed81f81db49da4599080960d

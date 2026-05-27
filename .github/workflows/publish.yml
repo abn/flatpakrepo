@@ -36,7 +36,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
+      matrix-manifest: ${{ steps.plan.outputs.matrix-manifest }}
+      matrix-bundle: ${{ steps.plan.outputs.matrix-bundle }}
       count: ${{ steps.plan.outputs.count }}
+      count-manifest: ${{ steps.plan.outputs.count-manifest }}
+      count-bundle: ${{ steps.plan.outputs.count-bundle }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -62,24 +66,176 @@ jobs:
           BASE_SHA: ${{ github.event.before }}
         run: python .github/scripts/plan.py
 
-  publish:
-    name: Publish ${{ matrix.app-id }}
+  build-manifest:
+    name: Build ${{ matrix.app-id }} (${{ matrix.arch }})
+    needs: plan
+    if: ${{ needs.plan.outputs.count-manifest != '0' }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix-manifest) }}
+    permissions:
+      contents: read
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:${{ matrix.runtime }}
+      options: --privileged
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Build Flatpak
+        uses: aetherpak/actions/build@v1
+        with:
+          manifest-path: ${{ matrix.manifest }}
+          arch: ${{ matrix.arch }}
+          branch: ${{ matrix.branch }}
+          repo-path: _repo
+          run-linter: false
+
+      - name: Upload OSTree repository
+        uses: actions/upload-artifact@v7
+        with:
+          name: repo-${{ matrix.app-id }}-${{ matrix.arch }}
+          path: _repo
+          retention-days: 1
+
+  prep-bundle:
+    name: Fetch ${{ matrix.app-id }} (${{ matrix.arch }})
+    needs: plan
+    if: ${{ needs.plan.outputs.count-bundle != '0' }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix-bundle) }}
+    permissions:
+      contents: read
+    steps:
+      - name: Fetch and verify bundle
+        env:
+          URL: ${{ matrix.bundle-url }}
+          SHA: ${{ matrix.bundle-sha256 }}
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o bundle.flatpak "$URL"
+          echo "$SHA  bundle.flatpak" | sha256sum -c -
+
+      - name: Upload bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: bundle-${{ matrix.app-id }}-${{ matrix.arch }}
+          path: bundle.flatpak
+          retention-days: 1
+
+  publish-init:
+    name: Seed site artifact
     needs: plan
     if: ${{ needs.plan.outputs.count != '0' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create empty site
+        run: mkdir -p _site
+
+      - name: Upload empty site
+        uses: actions/upload-artifact@v7
+        with:
+          name: aetherpak-site
+          path: _site
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: ignore
+
+  publish:
+    name: Publish ${{ matrix.app-id }} (${{ matrix.arch }})
+    needs: [plan, build-manifest, prep-bundle, publish-init]
+    # Run when one of build-manifest or prep-bundle was skipped (no entries of
+    # that kind selected).
+    if: ${{ !cancelled() && !failure() && needs.plan.outputs.count != '0' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
-      # max-parallel: 1 keeps the aetherpak reusable workflow's job-level
-      # concurrency lock from ever seeing 3+ pending; otherwise GitHub Actions
-      # would cancel the oldest pending and drop an app.
+      # max-parallel: 1 + artifact pass-through serializes the index/static
+      # write so cells never clobber each other's blobs or signatures.
       fail-fast: false
       max-parallel: 1
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
-    uses: aetherpak/actions/.github/workflows/publish.yml@v1
-    with:
-      manifest-path: ${{ matrix.manifest }}
-      runtime: ${{ matrix.runtime }}
-      arches: ${{ matrix.arches }}
-      branch: ${{ matrix.branch }}
-      run-linter: false
-    secrets:
-      gpg-private-key: ${{ secrets.AETHERPAK_GPG_KEY }}
-      gpg-private-key-passphrase: ${{ secrets.AETHERPAK_GPG_KEY_PASSPHRASE }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download running site
+        uses: actions/download-artifact@v8
+        with:
+          name: aetherpak-site
+          path: _site
+
+      - name: Download OSTree repo
+        if: ${{ matrix.source == 'manifest' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: repo-${{ matrix.app-id }}-${{ matrix.arch }}
+          path: _repo
+
+      - name: Download bundle
+        if: ${{ matrix.source == 'bundle' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: bundle-${{ matrix.app-id }}-${{ matrix.arch }}
+          path: _bundle
+
+      - name: Publish
+        uses: aetherpak/actions/publish@v1
+        with:
+          repo-path: _repo
+          # Pass branch only for manifest source; bundle imports keep the
+          # upstream ref's branch and overriding here would cause a mismatch in
+          # the later `flatpak build-bundle --oci` step.
+          bundle-path: ${{ matrix.source == 'bundle' && '_bundle/bundle.flatpak' || '' }}
+          app-id: ${{ matrix.app-id }}
+          arch: ${{ matrix.arch }}
+          branch: ${{ matrix.source == 'manifest' && matrix.branch || '' }}
+          pages-url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+          upload-pages-artifact: "false"
+          landing-page: "true"
+          signing: auto
+          gpg-private-key: ${{ secrets.AETHERPAK_GPG_KEY }}
+          gpg-private-key-passphrase: ${{ secrets.AETHERPAK_GPG_KEY_PASSPHRASE }}
+
+      - name: Re-upload site
+        uses: actions/upload-artifact@v7
+        with:
+          name: aetherpak-site
+          path: _site
+          include-hidden-files: true
+          retention-days: 1
+          overwrite: true
+
+  deploy:
+    name: Deploy to Pages
+    needs: [plan, publish]
+    if: ${{ !cancelled() && !failure() && needs.plan.outputs.count != '0' }}
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Download final site
+        uses: actions/download-artifact@v8
+        with:
+          name: aetherpak-site
+          path: _site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+      - name: Deploy
+        id: deploy
+        uses: actions/deploy-pages@v5

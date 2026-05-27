@@ -8,72 +8,88 @@ remote plus per-app `.flatpakref` files from GitHub Pages.
 
 ## Layout
 
-Each app lives under `apps/<appid>/` as a git submodule pointing at its source
-flatpak repository. The manifest path, runtime container image, and
-architectures are declared explicitly in [`apps.yaml`](apps.yaml) — no
-auto-detection of any kind, so adding or removing an app is a one-line edit.
+Apps are declared in [`apps.yaml`](apps.yaml) under one of two source kinds:
 
-```
-apps/
-└── ai.lemonade_server.Lemonade/        # submodule: lemonade-sdk/lemonade-flatpak
-    └── ai.lemonade_server.Lemonade.yaml
-apps.yaml                                # declarative matrix source
-```
-
-A typical `apps.yaml` entry:
+- **`manifest`** — flatpak manifest from a git submodule under `apps/<appid>/`,
+  built in CI inside a `flathub-infra/flatpak-github-actions` container.
+- **`bundles`** — pre-built `.flatpak` release assets per architecture, fetched
+  by URL and verified against a SHA-256 checksum.
 
 ```yaml
 apps:
-  - id: ai.lemonade_server.Lemonade
+  - id: ai.lemonade_server.Lemonade        # manifest source
     manifest: apps/ai.lemonade_server.Lemonade/ai.lemonade_server.Lemonade.yaml
-    runtime: gnome-50                    # flathub-infra image tag
+    runtime: gnome-50                       # flathub-infra image tag
     arches: [x86_64]
-    branch: stable                       # optional; defaults to stable
+    branch: stable
+
+  - id: com.stacklok.ToolHive              # bundle source
+    bundles:
+      x86_64:
+        url: https://github.com/.../com.stacklok.ToolHive_x86_64.flatpak
+        sha256: <hex>
+      aarch64:
+        url: https://github.com/.../com.stacklok.ToolHive_aarch64.flatpak
+        sha256: <hex>
 ```
+
+`manifest` and `bundles` are mutually exclusive. For manifest entries the
+submodule lives at `apps/<appid>/`; for bundle entries there is no submodule.
 
 ## Adding an app
 
+### Manifest source (build from upstream sources)
+
 ```bash
 git submodule add https://github.com/<owner>/<repo>.git apps/<appid>
-# Then append an entry to apps.yaml
+# Append an entry to apps.yaml: id, manifest path, runtime, arches
+git commit -am "Add <appid>"
+git push
+```
+
+### Bundle source (import upstream release asset)
+
+```bash
+# Compute checksums
+curl -fLO https://github.com/.../<file>_x86_64.flatpak
+sha256sum <file>_x86_64.flatpak
+# Append an entry to apps.yaml with bundles.{x86_64,aarch64}.{url,sha256}
 git commit -am "Add <appid>"
 git push
 ```
 
 ## Updating an app
 
-```bash
-git submodule update --remote apps/<appid>
-git commit -am "Bump <appid>"
-git push
-```
-
-Only the apps whose submodule pointer (or any file under their directory)
-changed get rebuilt.
+Manifest: `git submodule update --remote apps/<appid>` then commit. Bundle:
+edit the version in URL and update sha256 in `apps.yaml`. Either way, only the
+apps whose entry (or, for manifests, whose directory) actually changed get
+rebuilt.
 
 ## Build pipeline
 
 [`.github/workflows/publish.yml`](.github/workflows/publish.yml) runs on
 `push`, `workflow_dispatch`, and a weekly `schedule`:
 
-1. **plan** — [`.github/scripts/plan.py`](.github/scripts/plan.py) diffs
-   `HEAD` against `github.event.before` and intersects the touched paths with
-   `apps.yaml` to emit a matrix of `{app-id, manifest, runtime, branch,
-   arches}` entries. A change to `apps.yaml`, the workflow itself, or
-   `plan.py` triggers a full rebuild; `schedule`, `workflow_dispatch`
-   `force-all`, and any push without a reliable base SHA do the same.
-2. **publish** — matrix-of-reusable-workflow calls to
-   `aetherpak/actions/.github/workflows/publish.yml@v1`, one invocation per
-   app, with `strategy.max-parallel: 1`. Each call handles build (per-arch
-   matrix inside the reusable workflow), OCI push to GHCR, index merge with
-   optional signing, and a Pages deploy. The next call seeds its
-   `index/static` from the previous deploy.
+1. **plan** — [`plan.py`](.github/scripts/plan.py) diffs `HEAD` against
+   `github.event.before`, then narrows the rebuild set per app:
+   - Manifest apps rebuild if their directory has touched files, *or* their
+     entry-dict in `apps.yaml` changed.
+   - Bundle apps rebuild only if their entry-dict in `apps.yaml` changed (sha
+     bump, URL change, arches change, …).
+   - Touching the workflow or `plan.py` itself force-rebuilds everything.
+2. **build-manifest** — `(app × arch)` matrix in a `flathub-infra` container,
+   parallel. Uploads OSTree-repo artifacts.
+3. **prep-bundle** — `(app × arch)` matrix on a vanilla runner, parallel.
+   `curl -fL` + `sha256sum -c`, then uploads each verified `.flatpak`.
+4. **publish** — single matrix over both sources with `max-parallel: 1`. Each
+   cell downloads the running site artifact, runs `aetherpak/actions/publish@v1`
+   with either `repo-path` (manifest) or `bundle-path` (bundle), then re-uploads
+   the site. Serialization keeps `index/static`, blobs, and signatures from
+   clobbering across cells.
+5. **deploy** — one `actions/deploy-pages@v5` from the final site artifact.
 
-`max-parallel: 1` is what keeps the reusable workflow's per-repo concurrency
-lock from ever holding 3+ pending publishes, which GitHub Actions would
-otherwise resolve by cancelling the oldest pending. Combined with the
-top-level `concurrency: flatpakrepo-publish`, no two runs ever race the same
-`index/static`.
+The top-level `concurrency: flatpakrepo-publish` (`cancel-in-progress: false`)
+prevents two runs from racing each other's deploys.
 
 ### Manual triggers
 
