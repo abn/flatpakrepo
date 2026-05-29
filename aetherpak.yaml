@@ -1,25 +1,11 @@
-# Declarative list of apps published by this repository.
-#
-# Two source kinds (mutually exclusive per entry):
-#   manifest  Build from a flatpak manifest checked into a submodule.
-#             Requires `manifest` (path) and `runtime` (flathub-infra tag).
-#   bundles   Import a prebuilt .flatpak release asset per architecture.
-#             Each arch needs a `url` and `sha256`.
-#
-# Common fields:
-#   id          Reverse-DNS application ID (must match the manifest's app-id).
-#   arches      Optional. For manifest: list of arches to build; defaults to [x86_64].
-#               For bundles: derived from the bundles keys.
-#   branch      Optional. Flatpak channel; defaults to 'stable'.
-#   run-linter  Optional. Manifest entries only. Defaults to false; set true to
-#               run flatpak-builder-lint against the built repo.
-
 apps:
   - id: ai.lemonade_server.Lemonade
     manifest: apps/ai.lemonade_server.Lemonade/ai.lemonade_server.Lemonade.yaml
     runtime: gnome-50
     arches: [x86_64]
     branch: stable
+    builder_args:
+      - --install-deps-from=flathub
 
   - id: com.stacklok.ToolHive
     bundles:
