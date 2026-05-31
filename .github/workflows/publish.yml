@@ -33,7 +33,7 @@ concurrency:
 
 jobs:
   publish:
-    uses: aetherpak/actions/.github/workflows/publish-multi.yml@feat/unified-publish-workflow
+    uses: aetherpak/actions/.github/workflows/publish.yml@feat/unified-publish-workflow
     with:
       config: aetherpak.yaml
       app: ${{ inputs.app || '' }}
