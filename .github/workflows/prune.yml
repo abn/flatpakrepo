@@ -1,0 +1,30 @@
+name: Prune GitHub Container Registry
+
+on:
+  schedule:
+    - cron: "0 0 1,15 * *"
+  workflow_dispatch:
+    inputs:
+      app-id:
+        description: "Optional: Specific flatpak App ID to prune. If omitted, all apps are pruned."
+        required: false
+        type: string
+        default: ""
+      dry-run:
+        description: "Dry run mode. List versions that would be pruned without deleting them."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  prune:
+    uses: aetherpak/actions/.github/workflows/prune-github-container-registry.yml@main
+    with:
+      app-id: ${{ inputs.app-id || '' }}
+      dry-run: ${{ inputs.dry-run || false }}
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
