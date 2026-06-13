@@ -1,17 +1,10 @@
 apps:
-  - id: ai.lemonade_server.Lemonade
-    manifest: apps/ai.lemonade_server.Lemonade/ai.lemonade_server.Lemonade.yaml
-    runtime: gnome-50
-    arches: [x86_64]
-    branch: stable
-    builder_args:
-      - --install-deps-from=flathub
-
   - id: com.stacklok.ToolHive
+    branch: stable
     bundles:
       x86_64:
-        url: https://github.com/stacklok/toolhive-studio/releases/download/v0.35.2/com.stacklok.ToolHive_x86_64.flatpak
-        sha256: 2159fc643175dcf54f8b9293f48fb8b11577fa0ea5514c2af622ff922d349a4a
+        url: https://github.com/stacklok/toolhive-studio/releases/download/v0.36.2/com.stacklok.ToolHive_x86_64.flatpak
+        sha256: e74629f61d50a134c3ce836e9736d6489775dfe9fa863a1d4b37d4c79905e573
       aarch64:
-        url: https://github.com/stacklok/toolhive-studio/releases/download/v0.35.2/com.stacklok.ToolHive_aarch64.flatpak
-        sha256: a74e9855d8a66eaa03f9beff3c42b4973eb4ac91ed81f81db49da4599080960d
+        url: https://github.com/stacklok/toolhive-studio/releases/download/v0.36.2/com.stacklok.ToolHive_aarch64.flatpak
+        sha256: 7369d8483d80e61fcdeb00ac61a120667e9601d2b87b99769bd161fbd026b976
