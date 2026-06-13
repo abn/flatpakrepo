@@ -1,3 +1,5 @@
+repo_title: "abn.github.io"
+
 apps:
   - id: com.stacklok.ToolHive
     branch: stable
